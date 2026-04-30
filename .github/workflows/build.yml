@@ -1,62 +1,78 @@
-name: SNANDer-CH347 全平台编译
+name: Build SNANDer-CH347 All Platforms
+
 on:
   push:
-    branches: [ main, master ]
-  workflow_dispatch:
+    tags:
+      - '*'
 
 permissions:
   contents: write
 
 jobs:
   build:
+    name: Build & Publish
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    strategy:
+      matrix:
+        include:
+          # Windows
+          - artifact: ./artifact/x86/snander.exe
+            asset: SNANDer-Windows-32bit.exe
+          - artifact: ./artifact/x64/snander.exe
+            asset: SNANDer-Windows-64bit.exe
+          # Linux
+          - artifact: ./artifact/linux-x64/snander
+            asset: SNANDer-Linux-x64
+          - artifact: ./artifact/linux-armv7/snander
+            asset: SNANDer-Linux-armv7
+          - artifact: ./artifact/linux-arm64/snander
+            asset: SNANDer-Linux-arm64
 
-      - name: Install dependencies
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Install build tools
         run: |
           sudo apt update
-          sudo apt install -y build-essential mingw-w64 wget tar bzip2 zip
+          sudo apt install -y mingw-w64 make wget tar bzip2 zip
           sudo apt install -y gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
-          chmod +x build-for-*.sh
 
+      # 编译 Windows
       - name: Build Windows
-        run: ./build-for-windows.sh
-
-      - name: Build Linux
-        run: ./build-for-linux.sh
-
-      - name: Show all files
-        run: find build -type f
-
-      - name: Pack all files
         run: |
-          mkdir -p release
+          chmod +x build-for-windows.sh
+          ./build-for-windows.sh
+
+      # 编译 Linux
+      - name: Build Linux
+        run: |
+          chmod +x build-for-linux.sh
+          ./build-for-linux.sh
+
+      # 统一复制所有文件到 artifact
+      - name: Prepare all artifacts
+        run: |
+          mkdir -p ./artifact/
           # Windows
-          cp build/x86/*.exe release/
-          cp build/x64/*.exe release/
+          cp -r ./build/x86    ./artifact/
+          cp -r ./build/x64    ./artifact/
           # Linux
-          cp build/x64/snander-linux-* release/
-          # Zip
-          cd release
-          for f in *; do zip "${f}.zip" "$f"; done
+          cp -r ./build/linux-x64   ./artifact/
+          cp -r ./build/linux-armv7 ./artifact/
+          cp -r ./build/linux-arm64 ./artifact/
 
-      - name: Upload
-        uses: upload-artifact@v4
-        with:
-          name: SNANDer-All
-          path: release/*.zip
+          # 查看文件（排错用）
+          ls -lh ./artifact/
 
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: download-artifact@v4
+      # 自动上传全部 5 个文件到 Release
+      - name: Upload to Release
+        uses: svenstaro/upload-release-action@v2
         with:
-          name: SNANDer-All
-      - uses: softprops/action-gh-release@v2
-        with:
-          tag_name: build-${{ github.run_number }}
-          name: SNANDer-CH347 自动编译
-          files: "*.zip"
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ${{ matrix.artifact }}
+          asset_name: ${{ matrix.asset }}
+          tag: ${{ github.ref_name }}
+          overwrite: true
