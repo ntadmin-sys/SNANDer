@@ -1,0 +1,40 @@
+name: Build & Publish
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential mingw-w64 make wget tar bzip2 zip gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
+
+      - name: Build Windows
+        run: |
+          chmod +x build-for-windows.sh
+          ./build-for-windows.sh
+
+      - name: Build Linux
+        run: |
+          chmod +x build-for-linux.sh
+          ./build-for-linux.sh
+
+      - name: Show files
+        run: ls -lhR build/
+
+      - name: Zip build folder
+        run: zip -r build-all.zip build/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          files: build-all.zip
+          overwrite: true
