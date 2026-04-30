@@ -6,7 +6,7 @@ SRC_DIR="$PWD/src"
 BASE_BUILD_DIR="$PWD/build"
 DOWNLOAD_DIR="$PWD/dl"
 
-LIBUSB_VER="1.0.27"
+LIBUSB_VER="1.0.29"
 LIBUSB_URL="https://github.com/libusb/libusb/releases/download/v${LIBUSB_VER}/libusb-${LIBUSB_VER}.tar.bz2"
 
 ARCHS="x86_64 armv7 armv8"
