@@ -8,10 +8,10 @@ BASE_BUILD_DIR="$PWD/build"
 DOWNLOAD_DIR="$PWD/dl"
 
 LIBUSB_VER="1.0.27"
-LIBUSB_URL="https://github.com/libusb/libusb/releases/download/v${LIBUSB_VER}/libusb-${LIBUSB_VER}.tar.bz2"
+LIBUSB_URL="https://github.com/libusb/releases/download/v${LIBUSB_VER}/libusb-${LIBUSB_VER}.tar.bz2"
 
-# 支持架构
-ARCHS="x86 x86_64 armv7 armv8"
+# 稳定支持的架构（GitHub Actions 全兼容）
+ARCHS="x86_64 armv7 armv8"
 
 # ===================== 基础函数 =====================
 prepare_dirs() {
@@ -44,9 +44,7 @@ build_libusb() {
     cd "$LIBUSB_SOURCE"
     make distclean >/dev/null 2>&1 || true
 
-    if [ "$arch" = "x86" ]; then
-        CFLAGS="-m32" LDFLAGS="-m32" ./configure --prefix="$LIBS_DIR" --disable-udev --host=i686-linux-gnu
-    elif [ "$arch" = "x86_64" ]; then
+    if [ "$arch" = "x86_64" ]; then
         ./configure --prefix="$LIBS_DIR" --disable-udev
     elif [ "$arch" = "armv7" ]; then
         ./configure --prefix="$LIBS_DIR" --disable-udev --host=arm-linux-gnueabihf
@@ -74,9 +72,7 @@ build_snander() {
     cd "$SRC_DIR"
     make clean >/dev/null 2>&1
 
-    if [ "$arch" = "x86" ]; then
-        make CC="gcc -m32" CXX="g++ -m32" CONFIG_STATIC=yes LIBS_BASE="$LIBS_DIR" strip
-    elif [ "$arch" = "x86_64" ]; then
+    if [ "$arch" = "x86_64" ]; then
         make CC="gcc" CXX="g++" CONFIG_STATIC=yes LIBS_BASE="$LIBS_DIR" strip
     elif [ "$arch" = "armv7" ]; then
         make CC="arm-linux-gnueabihf-gcc" CXX="arm-linux-gnueabihf-g++" CONFIG_STATIC=yes LIBS_BASE="$LIBS_DIR" strip
@@ -100,6 +96,7 @@ done
 
 echo ""
 echo "====================================="
-echo " 🎉 所有平台编译完成！"
-echo " 输出：$BASE_BUILD_DIR/"
+echo " 🎉 编译完成！"
+echo " 输出文件：$BASE_BUILD_DIR/"
+echo " 包含：x86_64 / armv7 / armv8"
 echo "====================================="
