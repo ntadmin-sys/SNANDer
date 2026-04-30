@@ -1,88 +1,102 @@
 #!/bin/sh
 set -e
 
-# ===================== 配置区 =====================
 PWD=$(pwd)
 SRC_DIR="$PWD/src"
 BASE_BUILD_DIR="$PWD/build"
 DOWNLOAD_DIR="$PWD/dl"
 
 LIBUSB_VER="1.0.27"
-LIBUSB_URL="https://github.com/libusb/releases/download/v${LIBUSB_VER}/libusb-${LIBUSB_VER}.tar.bz2"
+LIBUSB_URL="https://github.com/libusb/libusb/releases/download/v${LIBUSB_VER}/libusb-${LIBUSB_VER}.tar.bz2"
 
-# 稳定支持的架构（GitHub Actions 全兼容）
-ARCHS="x86_64 armv7 armv8"
+# 支持架构
+ARCHS="x86 x86_64 armv7 armv8"
 
-# ===================== 基础函数 =====================
 prepare_dirs() {
-    mkdir -p "$DOWNLOAD_DIR"
+	mkdir -p "$DOWNLOAD_DIR"
 }
 
 download_libusb() {
-    cd "$DOWNLOAD_DIR"
-    if [ ! -d "libusb-${LIBUSB_VER}" ]; then
-        if [ ! -f "libusb-${LIBUSB_VER}.tar.bz2" ]; then
-            wget -O libusb-${LIBUSB_VER}.tar.bz2 "$LIBUSB_URL"
-        fi
-        tar xf libusb-${LIBUSB_VER}.tar.bz2
-    fi
-    LIBUSB_SOURCE="$DOWNLOAD_DIR/libusb-${LIBUSB_VER}"
+	cd "$DOWNLOAD_DIR"
+	if [ ! -d "libusb-${LIBUSB_VER}" ]; then
+		if [ ! -f "libusb-${LIBUSB_VER}.tar.bz2" ]; then
+			wget -O libusb-${LIBUSB_VER}.tar.bz2 "$LIBUSB_URL"
+		fi
+		tar xf libusb-${LIBUSB_VER}.tar.bz2
+	fi
+	LIBUSB_SOURCE="$DOWNLOAD_DIR/libusb-${LIBUSB_VER}"
 }
 
-# ===================== 编译 libusb =====================
 build_libusb() {
-    arch=$1
-    BUILD_DIR="${BASE_BUILD_DIR}/${arch}"
-    LIBS_DIR="${BUILD_DIR}/libs"
-    mkdir -p "$LIBS_DIR"
+	arch=$1
+	BUILD_DIR="${BASE_BUILD_DIR}/${arch}"
+	LIBS_DIR="${BUILD_DIR}/libs"
+	mkdir -p "$LIBS_DIR"
 
-    echo ""
-    echo "====================================="
-    echo "  编译 libusb [架构: $arch]"
-    echo "====================================="
+	echo ""
+	echo "====================================="
+	echo "  编译 libusb [架构: $arch]"
+	echo "====================================="
 
-    cd "$LIBUSB_SOURCE"
-    make distclean >/dev/null 2>&1 || true
+	cd "$LIBUSB_SOURCE"
+	make distclean >/dev/null 2>&1 || true
 
-    if [ "$arch" = "x86_64" ]; then
-        ./configure --prefix="$LIBS_DIR" --disable-udev
-    elif [ "$arch" = "armv7" ]; then
-        ./configure --prefix="$LIBS_DIR" --disable-udev --host=arm-linux-gnueabihf
-    elif [ "$arch" = "armv8" ]; then
-        ./configure --prefix="$LIBS_DIR" --disable-udev --host=aarch64-linux-gnu
-    fi
+	if [ "$arch" = "x86" ]; then
+		CFLAGS="-m32" LDFLAGS="-m32" ./configure --prefix="$LIBS_DIR" --disable-udev --host=i686-linux-gnu
+	elif [ "$arch" = "x86_64" ]; then
+		./configure --prefix="$LIBS_DIR" --disable-udev
+	elif [ "$arch" = "armv7" ]; then
+		./configure --prefix="$LIBS_DIR" --disable-udev --host=arm-linux-gnueabihf
+	elif [ "$arch" = "armv8" ]; then
+		./configure --prefix="$LIBS_DIR" --disable-udev --host=aarch64-linux-gnu
+	fi
 
-    make -j$(nproc)
-    make install
-    make distclean >/dev/null 2>&1 || true
+	make -j$(nproc)
+	make install
+	make distclean >/dev/null 2>&1 || true
 }
 
-# ===================== 编译 snander =====================
 build_snander() {
-    arch=$1
-    BUILD_DIR="${BASE_BUILD_DIR}/${arch}"
-    LIBS_DIR="${BUILD_DIR}/libs"
-    OUTPUT="${BASE_BUILD_DIR}/snander-${arch}"
+	arch=$1
+	BUILD_DIR="${BASE_BUILD_DIR}/${arch}"
+	LIBS_DIR="${BUILD_DIR}/libs"
+	OUTPUT="${BASE_BUILD_DIR}/snander-${arch}"
 
-    echo ""
-    echo "====================================="
-    echo "  编译 snander [架构: $arch]"
-    echo "====================================="
+	echo ""
+	echo "====================================="
+	echo "  编译 snander [架构: $arch]"
+	echo "====================================="
 
-    cd "$SRC_DIR"
-    make clean >/dev/null 2>&1
+	cd "$SRC_DIR"
+	make clean >/dev/null 2>&1
 
-    if [ "$arch" = "x86_64" ]; then
-        make CC="gcc" CXX="g++" CONFIG_STATIC=yes LIBS_BASE="$LIBS_DIR" strip
-    elif [ "$arch" = "armv7" ]; then
-        make CC="arm-linux-gnueabihf-gcc" CXX="arm-linux-gnueabihf-g++" CONFIG_STATIC=yes LIBS_BASE="$LIBS_DIR" strip
-    elif [ "$arch" = "armv8" ]; then
-        make CC="aarch64-linux-gnu-gcc" CXX="aarch64-linux-gnu-g++" CONFIG_STATIC=yes LIBS_BASE="$LIBS_DIR" strip
-    fi
+	# ==========================
+	# 🔥 关键修复：正确交叉编译 + 正确 strip
+	# ==========================
+	if [ "$arch" = "x86" ]; then
+		make CC="gcc -m32" CXX="g++ -m32" \
+			CONFIG_STATIC=yes LIBS_BASE="$LIBS_DIR"
+		strip snander
 
-    mv -f snander "$OUTPUT"
-    make clean >/dev/null 2>&1
-    echo "✅ 完成：$OUTPUT"
+	elif [ "$arch" = "x86_64" ]; then
+		make CC="gcc" CXX="g++" \
+			CONFIG_STATIC=yes LIBS_BASE="$LIBS_DIR"
+		strip snander
+
+	elif [ "$arch" = "armv7" ]; then
+		make CC="arm-linux-gnueabihf-gcc" CXX="arm-linux-gnueabihf-g++" \
+			CONFIG_STATIC=yes LIBS_BASE="$LIBS_DIR" LDFLAGS_EXTRA="-static-libgcc"
+		arm-linux-gnueabihf-strip snander  # 🔥 用 ARM 专属 strip
+
+	elif [ "$arch" = "armv8" ]; then
+		make CC="aarch64-linux-gnu-gcc" CXX="aarch64-linux-gnu-g++" \
+			CONFIG_STATIC=yes LIBS_BASE="$LIBS_DIR" LDFLAGS_EXTRA="-static-libgcc"
+		aarch64-linux-gnu-strip snander  # 🔥 用 ARM64 专属 strip
+	fi
+
+	mv -f snander "$OUTPUT"
+	make clean >/dev/null 2>&1
+	echo "✅ 完成：$OUTPUT"
 }
 
 # ===================== 主流程 =====================
@@ -90,13 +104,11 @@ prepare_dirs
 download_libusb
 
 for arch in $ARCHS; do
-    build_libusb "$arch"
-    build_snander "$arch"
+	build_libusb "$arch"
+	build_snander "$arch"
 done
 
 echo ""
 echo "====================================="
-echo " 🎉 编译完成！"
-echo " 输出文件：$BASE_BUILD_DIR/"
-echo " 包含：x86_64 / armv7 / armv8"
+echo " 🎉 全架构编译完成！"
 echo "====================================="
