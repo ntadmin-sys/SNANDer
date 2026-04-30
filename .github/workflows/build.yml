@@ -1,0 +1,91 @@
+name: Build SNANDer (Ubuntu Only)
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - win-x64
+          - win-x86
+          - win-arm64
+          - linux-x64
+          - linux-x86
+          - linux-arm64
+          - linux-armv7
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y make zip gcc gcc-multilib libusb-1.0-0-dev
+          sudo apt install -y mingw-w64
+          sudo apt install -y gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf
+
+      - name: Build
+        run: |
+          TARGET=${{ matrix.target }}
+          case $TARGET in
+            win-x64)
+              CC=x86_64-w64-mingw32-gcc
+              BIN=SNANDer-Win-x64.exe
+              ;;
+            win-x86)
+              CC=i686-w64-mingw32-gcc
+              BIN=SNANDer-Win-x86.exe
+              ;;
+            win-arm64)
+              CC=aarch64-w64-mingw32-gcc
+              BIN=SNANDer-Win-arm64.exe
+              ;;
+            linux-x64)
+              CC=gcc
+              BIN=snander-linux-x64
+              ;;
+            linux-x86)
+              CC=gcc
+              CFLAGS="-m32"
+              BIN=snander-linux-x86
+              ;;
+            linux-arm64)
+              CC=aarch64-linux-gnu-gcc
+              BIN=snander-linux-arm64
+              ;;
+            linux-armv7)
+              CC=arm-linux-gnueabihf-gcc
+              CFLAGS="-march=armv7-a -mfloat-abi=hard"
+              BIN=snander-linux-armv7
+              ;;
+          esac
+
+          make clean
+          make CC="$CC" CFLAGS="$CFLAGS" LDFLAGS="-lusb-1.0"
+          mv snander "$BIN"
+          zip "$BIN.zip" "$BIN"
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: "*.zip"
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    steps:
+      - uses: actions/download-artifact@v4
+      - uses: softprops/action-gh-release@v1
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: SNANDer-CH347 Auto Build
+          files: "*/**.zip"
