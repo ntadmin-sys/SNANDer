@@ -1,4 +1,4 @@
-name: SNANDer Ubuntu Only Build (ARMv7 + 32bit All)
+name: Build SNANDer (Ubuntu Only)
 
 on:
   push:
@@ -21,25 +21,19 @@ jobs:
           - linux-armv7
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Install toolchain & deps
+      - name: Install dependencies
         run: |
-          sudo apt update -y
-          sudo apt install -y make zip
-          sudo apt install -y gcc gcc-multilib libusb-1.0-0-dev
+          sudo apt update
+          sudo apt install -y make zip gcc gcc-multilib libusb-1.0-0-dev
           sudo apt install -y mingw-w64
-          sudo apt install -y gcc-aarch64-linux-gnu
-          sudo apt install -y gcc-arm-linux-gnueabihf
+          sudo apt install -y gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf
 
-      - name: Build each target
+      - name: Build
         run: |
-          set -e
           TARGET=${{ matrix.target }}
-          CC=""
-          CFLAGS=""
-          BIN=""
-
           case $TARGET in
             win-x64)
               CC=x86_64-w64-mingw32-gcc
@@ -68,7 +62,7 @@ jobs:
               ;;
             linux-armv7)
               CC=arm-linux-gnueabihf-gcc
-              CFLAGS="-march=armv7-a -mfloat-abi=hard -mfpu=vfpv3-d16"
+              CFLAGS="-march=armv7-a -mfloat-abi=hard"
               BIN=snander-linux-armv7
               ;;
           esac
@@ -76,13 +70,9 @@ jobs:
           make clean
           make CC="$CC" CFLAGS="$CFLAGS" LDFLAGS="-lusb-1.0"
           mv snander "$BIN"
+          zip "$BIN.zip" "$BIN"
 
-      - name: Zip artifact
-        run: |
-          BINFILE=$(ls | grep -E '^snander|^SNANDer.*\.exe')
-          zip "${BINFILE}.zip" "$BINFILE"
-
-      - name: Upload artifact
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target }}
@@ -94,14 +84,8 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     steps:
       - uses: actions/download-artifact@v4
-      - name: Release
-        uses: softprops/gh-release@v1
+      - uses: softprops/action-gh-release@v1
         with:
           tag_name: build-${{ github.run_number }}
-          name: SNANDer-CH347 全平台自动构建
-          body: |
-            支持：
-            Windows x64/x86/arm64
-            Linux x64/x86/arm64/armv7
-          files: |
-            */*.zip
+          name: SNANDer-CH347 Auto Build
+          files: "*/**.zip"
