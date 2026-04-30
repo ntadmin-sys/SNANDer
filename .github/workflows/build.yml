@@ -1,5 +1,4 @@
 name: Build Application All Platform
-
 on:
   workflow_dispatch:  # 仅手动触发
 
@@ -7,40 +6,17 @@ permissions:
   contents: write
 
 jobs:
-  publish:
-    name: Build and Publish Release
+  build:
+    name: Build & Publish
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          # Windows
-          - artifact_name: ./artifact/x86/snander.exe
-            asset_name: SNANDer-Windows-32bit.exe
-          - artifact_name: ./artifact/x64/snander.exe
-            asset_name: SNANDer-Windows-64bit.exe
-          # Linux
-          - artifact_name: ./artifact/linux-x64/snander
-            asset_name: SNANDer-Linux-x64
-          - artifact_name: ./artifact/linux-armv7/snander
-            asset_name: SNANDer-Linux-armv7
-          - artifact_name: ./artifact/linux-arm64/snander
-            asset_name: SNANDer-Linux-arm64
-
-    if: github.event.repository.owner.id == github.event.sender.id
-
     steps:
-      - name: Check out Git Repository
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: master
 
-      - name: Prepare Compilation Environment
-        env:
-          DEBIAN_FRONTEND: noninteractive
+      - name: Prepare Environment
         run: |
-          sudo -E apt-get update
-          sudo -E apt-get install -y pkg-config mingw-w64 tar wget make bzip2
-          sudo -E apt-get install -y gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
+          sudo apt update
+          sudo apt install -y mingw-w64 make wget tar bzip2 gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
 
       - name: Build Windows
         run: |
@@ -52,42 +28,29 @@ jobs:
           chmod +x build-for-linux.sh
           ./build-for-linux.sh
 
-      # ==========================================
-      # 打印编译输出状态（你要的功能在这里）
-      # ==========================================
-      - name: Show Build Output Status
-        run: |
-          echo "========================================"
-          echo " 查看 build 目录下所有文件"
-          echo "========================================"
-          ls -lhR build/
-          echo ""
+      # 打印所有编译文件（你要的状态输出）
+      - name: Show All Build Files
+        run: ls -lhR build/
 
-      - name: Prepare Artifact
+      # 复制全部文件
+      - name: Prepare All Files
         run: |
-          mkdir -p ./artifact/
-          cp -rf ./build/x86         ./artifact/
-          cp -rf ./build/x64         ./artifact/
-          cp -rf ./build/linux-x64    ./artifact/
-          cp -rf ./build/linux-armv7  ./artifact/
-          cp -rf ./build/linux-arm64  ./artifact/
+          mkdir -p release
+          cp build/x86/snander.exe            release/SNANDer-Windows-32bit.exe
+          cp build/x64/snander.exe            release/SNANDer-Windows-64bit.exe
+          cp build/linux-x64/snander          release/SNANDer-Linux-x64
+          cp build/linux-armv7/snander        release/SNANDer-Linux-armv7
+          cp build/linux-arm64/snander        release/SNANDer-Linux-arm64
 
-      # ==========================================
-      # 打印最终 artifact 目录状态
-      # ==========================================
-      - name: Show Final Artifact Status
-        run: |
-          echo "========================================"
-          echo " 查看最终打包文件"
-          echo "========================================"
-          ls -lhR artifact/
-          echo ""
+      # 打印最终文件
+      - name: Show Final Release Files
+        run: ls -lh release/
 
-      - name: Publish Release
-        uses: svenstaro/upload-release-action@v2
+      # 一次性发布所有文件（不会被取消！）
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ${{ matrix.artifact_name }}
-          asset_name: ${{ matrix.asset_name }}
-          tag: build-${{ github.run_number }}
+          tag_name: build-${{ github.run_number }}
+          name: SNANDer-CH347 自动编译版
+          files: release/*
           overwrite: true
