@@ -17,6 +17,7 @@ jobs:
           sudo dpkg --add-architecture i386
           sudo apt update
           sudo apt install -y mingw-w64
+          sudo apt install -y linux-libc-dev
           sudo apt install -y gcc make libudev-dev
           sudo apt install -y make wget gcc g++
           sudo apt install -y gcc-multilib g++-multilib libc6-dev-i386
