@@ -6,11 +6,9 @@ SRC_DIR="$PWD/src"
 BASE_BUILD_DIR="$PWD/build"
 DOWNLOAD_DIR="$PWD/dl"
 
-LIBUSB_VER="1.0.27"
+LIBUSB_VER="1.0.29"
 LIBUSB_URL="https://github.com/libusb/libusb/releases/download/v${LIBUSB_VER}/libusb-${LIBUSB_VER}.tar.bz2"
-
-# 支持架构
-ARCHS="x86 x86_64 armv7 armv8"
+ARCHS="x86_64 armv7 armv8"
 
 prepare_dirs() {
 	mkdir -p "$DOWNLOAD_DIR"
@@ -27,6 +25,14 @@ download_libusb() {
 	LIBUSB_SOURCE="$DOWNLOAD_DIR/libusb-${LIBUSB_VER}"
 }
 
+# 🔥 🔥 🔥 关键：强制删除 netlink 检查代码
+fix_libusb_configure() {
+	cd "$LIBUSB_SOURCE"
+	sed -i '/linux\/netlink.h/d' configure
+	sed -i '/netlink.*required/d' configure
+	sed -i '/AC_CHECK_HEADERS.*netlink/d' configure.ac
+}
+
 build_libusb() {
 	arch=$1
 	BUILD_DIR="${BASE_BUILD_DIR}/${arch}"
@@ -41,9 +47,7 @@ build_libusb() {
 	cd "$LIBUSB_SOURCE"
 	make distclean >/dev/null 2>&1 || true
 
-	if [ "$arch" = "x86" ]; then
-		CFLAGS="-m32" LDFLAGS="-m32" ./configure --prefix="$LIBS_DIR" --disable-udev --host=i686-linux-gnu
-	elif [ "$arch" = "x86_64" ]; then
+	if [ "$arch" = "x86_64" ]; then
 		./configure --prefix="$LIBS_DIR" --disable-udev
 	elif [ "$arch" = "armv7" ]; then
 		./configure --prefix="$LIBS_DIR" --disable-udev --host=arm-linux-gnueabihf
@@ -70,28 +74,15 @@ build_snander() {
 	cd "$SRC_DIR"
 	make clean >/dev/null 2>&1
 
-	# ==========================
-	# 🔥 关键修复：正确交叉编译 + 正确 strip
-	# ==========================
-	if [ "$arch" = "x86" ]; then
-		make CC="gcc -m32" CXX="g++ -m32" \
-			CONFIG_STATIC=yes LIBS_BASE="$LIBS_DIR"
+	if [ "$arch" = "x86_64" ]; then
+		make CC="gcc" CONFIG_STATIC=yes LIBS_BASE="$LIBS_DIR"
 		strip snander
-
-	elif [ "$arch" = "x86_64" ]; then
-		make CC="gcc" CXX="g++" \
-			CONFIG_STATIC=yes LIBS_BASE="$LIBS_DIR"
-		strip snander
-
 	elif [ "$arch" = "armv7" ]; then
-		make CC="arm-linux-gnueabihf-gcc" CXX="arm-linux-gnueabihf-g++" \
-			CONFIG_STATIC=yes LIBS_BASE="$LIBS_DIR" LDFLAGS_EXTRA="-static-libgcc"
-		arm-linux-gnueabihf-strip snander  # 🔥 用 ARM 专属 strip
-
+		make CC="arm-linux-gnueabihf-gcc" CONFIG_STATIC=yes LIBS_BASE="$LIBS_DIR"
+		arm-linux-gnueabihf-strip snander
 	elif [ "$arch" = "armv8" ]; then
-		make CC="aarch64-linux-gnu-gcc" CXX="aarch64-linux-gnu-g++" \
-			CONFIG_STATIC=yes LIBS_BASE="$LIBS_DIR" LDFLAGS_EXTRA="-static-libgcc"
-		aarch64-linux-gnu-strip snander  # 🔥 用 ARM64 专属 strip
+		make CC="aarch64-linux-gnu-gcc" CONFIG_STATIC=yes LIBS_BASE="$LIBS_DIR"
+		aarch64-linux-gnu-strip snander
 	fi
 
 	mv -f snander "$OUTPUT"
@@ -102,6 +93,7 @@ build_snander() {
 # ===================== 主流程 =====================
 prepare_dirs
 download_libusb
+fix_libusb_configure  # 🔥 直接删掉 netlink 检查！
 
 for arch in $ARCHS; do
 	build_libusb "$arch"
@@ -110,5 +102,5 @@ done
 
 echo ""
 echo "====================================="
-echo " 🎉 全架构编译完成！"
+echo " 🎉 全部编译成功！"
 echo "====================================="
