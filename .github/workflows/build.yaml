@@ -18,10 +18,11 @@ jobs:
           sudo apt update
           sudo apt install -y mingw-w64
           sudo apt install -y gcc make libudev-dev
-          sudo apt install -y gcc-multilib g++-multilib  # 🔥 关键：x86 32位 支持
+          sudo apt install -y make wget gcc g++
+          sudo apt install -y gcc-multilib g++-multilib libc6-dev-i386
           sudo apt install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
           sudo apt install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-          sudo apt install -y libc6-dev-i386 lib32gcc-12-dev  # 🔥 关键：32位标准库
+          sudo apt install -y libc6-dev-i386 lib32gcc-12-dev
 
       - name: Build Windows
         run: |
