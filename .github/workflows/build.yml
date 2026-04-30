@@ -1,4 +1,4 @@
-name: Build & Publish (ch347 branch)
+name: Build & Publish
 on:
   workflow_dispatch:
 
@@ -9,22 +9,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # 关键：强制拉取 ch347 分支代码
-      - name: Checkout code (ch347 branch)
-        uses: actions/checkout@v4
-        with:
-          ref: ch347  # 这里指定分支
-          fetch-depth: 0
+      - uses: actions/checkout@v4
 
-      # 缓存依赖，加速构建
-      - name: Cache apt dependencies
-        uses: actions/cache@v4
-        with:
-          path: /var/cache/apt/archives
-          key: ${{ runner.os }}-apt-build-deps
-
-      # 安装编译依赖
-      - name: Install build dependencies
+      - name: Install dependencies
         run: |
           sudo apt update
           sudo dpkg --add-architecture i386
@@ -38,35 +25,25 @@ jobs:
           sudo apt install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
           sudo apt install -y libc6-dev-i386 lib32gcc-12-dev
 
-      # 构建 Windows
-      - name: Build for Windows
+      - name: Build Windows
         run: |
           chmod +x build-for-windows.sh
           ./build-for-windows.sh
 
-      # 构建 Linux
-      - name: Build for Linux
+      - name: Build Linux
         run: |
           chmod +x build-for-linux.sh
           ./build-for-linux.sh
 
-      # 查看编译结果
-      - name: List built files
+      - name: Show files
         run: ls -lhR build/
 
-      # 打包
-      - name: Zip build output
+      - name: Zip build folder
         run: zip -r build-all.zip build/
 
-      # 发布 Release
-      - name: Create GitHub Release
+      - name: Create Release
         uses: softprops/action-gh-release@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: build-ch347-${{ github.run_number }}
-          name: Build ch347 #${{ github.run_number }}
+          tag_name: build-${{ github.run_number }}
           files: build-all.zip
           overwrite: true
-          draft: false
-          prerelease: false
