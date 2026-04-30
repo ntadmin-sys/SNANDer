@@ -1,72 +1,61 @@
-name: SNANDer-CH347 Full Build (Ubuntu Only)
-
+name: SNANDer-CH347 全平台编译
 on:
   push:
     branches: [ main, master ]
   workflow_dispatch:
 
+# 给 GITHUB_TOKEN 开启写权限（解决 403 错误）
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: 安装依赖
         run: |
-          sudo apt update -y
-          sudo apt install -y build-essential wget tar bzip2 zip
-          # Windows 交叉编译工具
-          sudo apt install -y mingw-w64
-          # Linux ARM 交叉编译工具
+          sudo apt update
+          sudo apt install -y build-essential mingw-w64 wget tar bzip2 zip
           sudo apt install -y gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
-          # 给所有构建脚本添加执行权限
           chmod +x build-for-*.sh
 
-      - name: Build Windows binaries
+      - name: 编译 Windows
         run: ./build-for-windows.sh
 
-      - name: Build Linux binaries
+      - name: 编译 Linux
         run: ./build-for-linux.sh
 
-      - name: Build Darwin binaries (macOS, 若脚本依赖 osxcross 可忽略)
+      - name: 打包所有文件
         run: |
-          # 如果 build-for-darwin.sh 需要 osxcross 工具链，这里会失败，可以注释掉这一步
-          ./build-for-darwin.sh || echo "macOS build skipped (needs osxcross)"
+          mkdir -p release
+          cp build/x86/*.exe release/
+          cp build/x64/* release/
+          cd release
+          zip -m SNANDer-Windows-x86.zip snander-win32.exe
+          zip -m SNANDer-Windows-x64.zip snander-win64.exe
+          zip -m SNANDer-Linux-x64.zip snander-linux-amd64
+          zip -m SNANDer-Linux-armv7.zip snander-linux-armv7
+          zip -m SNANDer-Linux-arm64.zip snander-linux-arm64
 
-      - name: Collect and zip all artifacts
-        run: |
-          mkdir -p out
-          # 假设脚本输出到 build/ 目录，按实际情况修改路径
-          find build -name "*.exe" -o -name "snander" | while read f; do
-            zip -j "out/$(basename $f).zip" "$f"
-          done
-
-      - name: Upload artifacts
+      - name: 上传编译产物
         uses: actions/upload-artifact@v4
         with:
-          name: SNANDer-All-Binaries
-          path: out/*.zip
+          name: SNANDer-All
+          path: release/*.zip
 
+  # 自动发布 Release
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
-          name: SNANDer-All-Binaries
-          path: ./out
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+          name: SNANDer-All
+      - uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: SNANDer-CH347 Full Build #${{ github.run_number }}
-          body: |
-            自动构建，支持平台：
-            - Windows (x86/x64)
-            - Linux (x86/x64/ARMv7/ARM64)
-            - macOS (若构建成功)
-          files: ./out/*.zip
+          name: SNANDer-CH347 自动编译版
+          files: "*.zip"
