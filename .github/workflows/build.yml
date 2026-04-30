@@ -1,6 +1,8 @@
 name: Build & Publish
 on:
   workflow_dispatch:
+  push:  # 临时加这行，让 GitHub 识别
+    branches: [ch347]
 
 permissions:
   contents: write
