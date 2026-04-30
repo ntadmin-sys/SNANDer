@@ -1,6 +1,6 @@
-name: Build & Publish (Pack build folder)
+name: Build & Publish
 on:
-  workflow_dispatch:  # 仅手动触发
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -9,14 +9,21 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install build tools
+      - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y build-essential mingw-w64 tar wget make bzip2 zip
-          sudo apt install -y gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
+          sudo dpkg --add-architecture i386
+          sudo apt update
+          sudo apt install -y mingw-w64
+          sudo apt install -y linux-libc-dev
+          sudo apt install -y gcc make libudev-dev
+          sudo apt install -y make wget gcc g++
+          sudo apt install -y gcc-multilib g++-multilib libc6-dev-i386
+          sudo apt install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
+          sudo apt install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          sudo apt install -y libc6-dev-i386 lib32gcc-12-dev
 
       - name: Build Windows
         run: |
@@ -28,19 +35,15 @@ jobs:
           chmod +x build-for-linux.sh
           ./build-for-linux.sh
 
-      # 显示编译结果
-      - name: Show build folder structure
+      - name: Show files
         run: ls -lhR build/
 
-      # 直接打包整个 build 文件夹
-      - name: Zip full build directory
+      - name: Zip build folder
         run: zip -r build-all.zip build/
 
-      # 发布打包好的 zip
-      - name: Upload to Release
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: SNANDer-CH347 完整编译包
           files: build-all.zip
           overwrite: true
