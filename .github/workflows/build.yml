@@ -12,11 +12,9 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          # Windows
           - win-x64
           - win-x86
           - win-arm64
-          # Linux
           - linux-x64
           - linux-x86
           - linux-arm64
@@ -29,11 +27,8 @@ jobs:
         run: |
           sudo apt update -y
           sudo apt install -y make zip
-          # 原生编译 + 32位支持
           sudo apt install -y gcc gcc-multilib libusb-1.0-0-dev
-          # Windows 交叉编译
           sudo apt install -y mingw-w64
-          # ARM64 + ARMv7 交叉工具链
           sudo apt install -y gcc-aarch64-linux-gnu
           sudo apt install -y gcc-arm-linux-gnueabihf
 
@@ -58,7 +53,6 @@ jobs:
               CC=aarch64-w64-mingw32-gcc
               BIN=SNANDer-Win-arm64.exe
               ;;
-
             linux-x64)
               CC=gcc
               BIN=snander-linux-x64
@@ -72,7 +66,6 @@ jobs:
               CC=aarch64-linux-gnu-gcc
               BIN=snander-linux-arm64
               ;;
-            # 重点：ARMv7 硬浮点标准交叉编译
             linux-armv7)
               CC=arm-linux-gnueabihf-gcc
               CFLAGS="-march=armv7-a -mfloat-abi=hard -mfpu=vfpv3-d16"
@@ -81,33 +74,34 @@ jobs:
           esac
 
           make clean
-          make CC=$CC CFLAGS="$CFLAGS" LDFLAGS="-lusb-1.0"
-          mv snander $BIN
+          make CC="$CC" CFLAGS="$CFLAGS" LDFLAGS="-lusb-1.0"
+          mv snander "$BIN"
 
       - name: Zip artifact
         run: |
-          BINFILE=$(ls | grep -E 'snander|SNANDer.*\.exe')
-          zip ${BINFILE}.zip ${BINFILE}
+          BINFILE=$(ls | grep -E '^snander|^SNANDer.*\.exe')
+          zip "${BINFILE}.zip" "$BINFILE"
 
-      - name: Upload
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target }}
-          path: *.zip
+          path: "*.zip"
 
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     steps:
       - uses: actions/download-artifact@v4
       - name: Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/gh-release@v1
         with:
-          tag_name: v${{ github.run_number }}
-          name: SNANDer-CH347 Full Build
+          tag_name: build-${{ github.run_number }}
+          name: SNANDer-CH347 全平台自动构建
           body: |
-            编译环境：Ubuntu Latest
-            包含：Win x64/x86/ARM64 | Linux x64/x86/ARM64/ARMv7
+            支持：
+            Windows x64/x86/arm64
+            Linux x64/x86/arm64/armv7
           files: |
-            *.zip
+            */*.zip
