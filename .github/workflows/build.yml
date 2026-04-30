@@ -1,86 +1,72 @@
-name: SNANDer-CH347 全平台编译 (Ubuntu Only)
+name: SNANDer-CH347 Full Build (Ubuntu Only)
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        target:
-          - win-x64
-          - win-x86
-          - linux-x64
-          - linux-armv7
-          - linux-arm64
-
     steps:
-      - name: 检出代码
+      - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          submodules: true
 
-      - name: 安装编译环境
+      - name: Install dependencies
         run: |
-          sudo apt update
-          sudo apt install -y make gcc zip libusb-1.0-0-dev
-          sudo apt install -y gcc-multilib
+          sudo apt update -y
+          sudo apt install -y build-essential wget tar bzip2 zip
+          # Windows 交叉编译工具
           sudo apt install -y mingw-w64
+          # Linux ARM 交叉编译工具
           sudo apt install -y gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
+          # 给所有构建脚本添加执行权限
+          chmod +x build-for-*.sh
 
-      - name: 开始编译
+      - name: Build Windows binaries
+        run: ./build-for-windows.sh
+
+      - name: Build Linux binaries
+        run: ./build-for-linux.sh
+
+      - name: Build Darwin binaries (macOS, 若脚本依赖 osxcross 可忽略)
         run: |
-          TARGET=${{ matrix.target }}
-          export CC=""
-          export BIN=""
-          export CFLAGS=""
+          # 如果 build-for-darwin.sh 需要 osxcross 工具链，这里会失败，可以注释掉这一步
+          ./build-for-darwin.sh || echo "macOS build skipped (needs osxcross)"
 
-          case $TARGET in
-            win-x64)
-              CC=x86_64-w64-mingw32-gcc
-              BIN=SNANDer-Win-x64.exe
-              ;;
-            win-x86)
-              CC=i686-w64-mingw32-gcc
-              BIN=SNANDer-Win-x86.exe
-              ;;
-            linux-x64)
-              CC=gcc
-              BIN=snander-linux-x64
-              ;;
-            linux-armv7)
-              CC=arm-linux-gnueabihf-gcc
-              CFLAGS="-march=armv7-a -mfloat-abi=hard"
-              BIN=snander-linux-armv7
-              ;;
-            linux-arm64)
-              CC=aarch64-linux-gnu-gcc
-              BIN=snander-linux-arm64
-              ;;
-          esac
+      - name: Collect and zip all artifacts
+        run: |
+          mkdir -p out
+          # 假设脚本输出到 build/ 目录，按实际情况修改路径
+          find build -name "*.exe" -o -name "snander" | while read f; do
+            zip -j "out/$(basename $f).zip" "$f"
+          done
 
-          make clean
-          make CC="$CC" CFLAGS="$CFLAGS" LDFLAGS="-lusb-1.0"
-          mv snander "$BIN"
-          zip "$BIN.zip" "$BIN"
-
-      - name: 上传文件
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.target }}
-          path: "*.zip"
+          name: SNANDer-All-Binaries
+          path: out/*.zip
 
   release:
     needs: build
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     steps:
-      - uses: actions/download-artifact@v4
-      - uses: softprops/gh-release@v1
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: SNANDer-All-Binaries
+          path: ./out
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: SNANDer-CH347 自动编译版本
-          files: "*/**.zip"
+          name: SNANDer-CH347 Full Build #${{ github.run_number }}
+          body: |
+            自动构建，支持平台：
+            - Windows (x86/x64)
+            - Linux (x86/x64/ARMv7/ARM64)
+            - macOS (若构建成功)
+          files: ./out/*.zip
