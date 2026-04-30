@@ -14,7 +14,13 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y build-essential mingw-w64 make wget tar bzip2 zip gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
+          sudo dpkg --add-architecture i386
+          sudo apt update
+          sudo apt install -y gcc make libudev-dev
+          sudo apt install -y gcc-multilib g++-multilib  # 🔥 关键：x86 32位 支持
+          sudo apt install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
+          sudo apt install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          sudo apt install -y libc6-dev-i386 lib32gcc-12-dev  # 🔥 关键：32位标准库
 
       - name: Build Windows
         run: |
