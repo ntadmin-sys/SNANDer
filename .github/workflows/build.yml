@@ -1,4 +1,4 @@
-name: Build SNANDer-CH347 All Platforms
+name: Build Application for All Platforms
 
 on:
   push:
@@ -9,70 +9,71 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    name: Build & Publish
+  publish:
+    name: Build and Publish Release
     runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
-          # Windows
-          - artifact: ./artifact/x86/snander.exe
-            asset: SNANDer-Windows-32bit.exe
-          - artifact: ./artifact/x64/snander.exe
-            asset: SNANDer-Windows-64bit.exe
-          # Linux
-          - artifact: ./artifact/linux-x64/snander
-            asset: SNANDer-Linux-x64
-          - artifact: ./artifact/linux-armv7/snander
-            asset: SNANDer-Linux-armv7
-          - artifact: ./artifact/linux-arm64/snander
-            asset: SNANDer-Linux-arm64
+          # WINDOWS
+          - artifact_name: ./artifact/x86/snander.exe
+            asset_name: SNANDer-Windows-32bit.exe
+
+          - artifact_name: ./artifact/x64/snander.exe
+            asset_name: SNANDer-Windows-64bit.exe
+
+          # LINUX
+          - artifact_name: ./artifact/linux-x64/snander
+            asset_name: SNANDer-Linux-x64
+
+          - artifact_name: ./artifact/linux-armv7/snander
+            asset_name: SNANDer-Linux-armv7
+
+          - artifact_name: ./artifact/linux-arm64/snander
+            asset_name: SNANDer-Linux-arm64
+
+    if: github.event.repository.owner.id == github.event.sender.id
 
     steps:
-      - name: Checkout code
+      - name: Check out Git Repository
         uses: actions/checkout@v4
         with:
           ref: master
 
-      - name: Install build tools
+      - name: Prepare Compilation Environment
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
-          sudo apt update
-          sudo apt install -y mingw-w64 make wget tar bzip2 zip
-          sudo apt install -y gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
+          sudo -E apt-get update
+          sudo -E apt-get install -y pkg-config mingw-w64 tar wget make bzip2
+          sudo -E apt-get install -y gcc-arm-linux-gnueabihf gcc-aarch64-linux-gnu
 
-      # 编译 Windows
       - name: Build Windows
         run: |
           chmod +x build-for-windows.sh
           ./build-for-windows.sh
 
-      # 编译 Linux
       - name: Build Linux
         run: |
           chmod +x build-for-linux.sh
           ./build-for-linux.sh
 
-      # 统一复制所有文件到 artifact
-      - name: Prepare all artifacts
+      - name: Prepare Artifact
         run: |
           mkdir -p ./artifact/
-          # Windows
-          cp -r ./build/x86    ./artifact/
-          cp -r ./build/x64    ./artifact/
-          # Linux
-          cp -r ./build/linux-x64   ./artifact/
-          cp -r ./build/linux-armv7 ./artifact/
-          cp -r ./build/linux-arm64 ./artifact/
+          cp -rf ./build/x86         ./artifact/
+          cp -rf ./build/x64         ./artifact/
+          cp -rf ./build/linux-x64    ./artifact/
+          cp -rf ./build/linux-armv7  ./artifact/
+          cp -rf ./build/linux-arm64  ./artifact/
 
-          # 查看文件（排错用）
           ls -lh ./artifact/
 
-      # 自动上传全部 5 个文件到 Release
-      - name: Upload to Release
+      - name: Publish Release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ${{ matrix.artifact }}
-          asset_name: ${{ matrix.asset }}
+          file: ${{ matrix.artifact_name }}
+          asset_name: ${{ matrix.asset_name }}
           tag: ${{ github.ref_name }}
           overwrite: true
