@@ -9,7 +9,7 @@ DOWNLOAD_DIR="$PWD/dl"
 LIBUSB_VER="1.0.27"
 LIBUSB_URL="https://github.com/libusb/libusb/releases/download/v${LIBUSB_VER}/libusb-${LIBUSB_VER}.tar.bz2"
 
-ARCHS="x86 x86_64 armv7 armv8"
+ARCHS="x86_64 armv7 armv8"
 
 prepare_dirs() {
 	mkdir -p "$DOWNLOAD_DIR"
@@ -40,15 +40,17 @@ build_libusb() {
 	cd "$LIBUSB_SOURCE"
 	make distclean >/dev/null 2>&1 || true
 
-	# 🔥 关键修复：--enable-netlink=no 彻底解决 netlink 报错
+	# ==========================
+	# 🔥 终极修复：完全关闭 netlink
+	# ==========================
 	if [ "$arch" = "x86" ]; then
-		CFLAGS="-m32" LDFLAGS="-m32" ./configure --prefix="$LIBS_DIR" --disable-udev --enable-netlink=no --host=i686-linux-gnu
+		CFLAGS="-m32" LDFLAGS="-m32" ./configure --prefix="$LIBS_DIR" --disable-udev --without-netlink --host=i686-linux-gnu
 	elif [ "$arch" = "x86_64" ]; then
-		./configure --prefix="$LIBS_DIR" --disable-udev --enable-netlink=no
+		./configure --prefix="$LIBS_DIR" --disable-udev --without-netlink
 	elif [ "$arch" = "armv7" ]; then
-		./configure --prefix="$LIBS_DIR" --disable-udev --enable-netlink=no --host=arm-linux-gnueabihf
+		./configure --prefix="$LIBS_DIR" --disable-udev --without-netlink --host=arm-linux-gnueabihf
 	elif [ "$arch" = "armv8" ]; then
-		./configure --prefix="$LIBS_DIR" --disable-udev --enable-netlink=no --host=aarch64-linux-gnu
+		./configure --prefix="$LIBS_DIR" --disable-udev --without-netlink --host=aarch64-linux-gnu
 	fi
 
 	make -j$(nproc)
@@ -79,11 +81,11 @@ build_snander() {
 		strip snander
 
 	elif [ "$arch" = "armv7" ]; then
-		make CC="arm-linux-gnueabihf-gcc" CONFIG_STATIC=yes LIBS_BASE="$LIBS_DIR" LDFLAGS_EXTRA="-static-libgcc"
+		make CC="arm-linux-gnueahif-gcc" CONFIG_STATIC=yes LIBS_BASE="$LIBS_DIR"
 		arm-linux-gnueabihf-strip snander
 
 	elif [ "$arch" = "armv8" ]; then
-		make CC="aarch64-linux-gnu-gcc" CONFIG_STATIC=yes LIBS_BASE="$LIBS_DIR" LDFLAGS_EXTRA="-static-libgcc"
+		make CC="aarch64-linux-gnu-gcc" CONFIG_STATIC=yes LIBS_BASE="$LIBS_DIR"
 		aarch64-linux-gnu-strip snander
 	fi
 
