@@ -25,6 +25,7 @@ jobs:
           sudo apt install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
           sudo apt install -y libc6-dev-i386 lib32gcc-12-dev
           sudo apt install -y libmnl-dev libnl-3-dev libnl-genl-3-dev
+          sudo apt install -y linux-headers-generic libnl-3-dev libnl-genl-3-dev libmnl-dev build-essential
 
       - name: Build Windows
         run: |
